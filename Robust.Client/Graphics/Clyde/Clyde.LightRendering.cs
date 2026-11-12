@@ -1300,15 +1300,16 @@ namespace Robust.Client.Graphics.Clyde
             var a = new Vector2(edge.X, edge.Y);
             var b = new Vector2(edge.Z, edge.W);
 
-            var startVisible = !sharedEdges[previous] && EdgeFacesPoint(edges[previous], eyePosition);
-            if (!startVisible && HasBoundaryVertex(a, convexBoundaryVertices))
-                startVisible = HasBoundaryVertex(a, visibleBoundaryVertices);
+            // Cheap neighbour-edge tests first: in wall runs one of them usually passes, which skips the
+            // boundary-vertex probes (up to 9 set lookups each).
+            if (!sharedEdges[previous] && EdgeFacesPoint(edges[previous], eyePosition)
+                || !sharedEdges[next] && EdgeFacesPoint(edges[next], eyePosition))
+            {
+                return true;
+            }
 
-            var endVisible = !sharedEdges[next] && EdgeFacesPoint(edges[next], eyePosition);
-            if (!endVisible && HasBoundaryVertex(b, convexBoundaryVertices))
-                endVisible = HasBoundaryVertex(b, visibleBoundaryVertices);
-
-            return startVisible || endVisible;
+            return HasBoundaryVertex(a, convexBoundaryVertices) && HasBoundaryVertex(a, visibleBoundaryVertices)
+                || HasBoundaryVertex(b, convexBoundaryVertices) && HasBoundaryVertex(b, visibleBoundaryVertices);
         }
 
         private static bool SharedEdgeContinuesThroughEyeProjection(

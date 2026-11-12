@@ -167,7 +167,7 @@ public sealed partial class EntityLookupSystem
 
             if (!approx)
             {
-                var intersectingTransform = state.Physics.GetLocalPhysicsTransform(value.Entity);
+                var intersectingTransform = state.Physics.GetLocalPhysicsTransform(value.Entity, value.Xform);
                 if (!state.Manifolds.TestOverlap(state.Shape, 0, value.Fixture.Shape, value.ChildIndex, state.Transform, intersectingTransform))
                 {
                     return true;
@@ -338,7 +338,7 @@ public sealed partial class EntityLookupSystem
 
             if (!approx)
             {
-                var intersectingTransform = state.Physics.GetLocalPhysicsTransform(value.Entity);
+                var intersectingTransform = state.Physics.GetLocalPhysicsTransform(value.Entity, value.Xform);
                 if (!state.Manifolds.TestOverlap(state.Shape, 0, value.Fixture.Shape, value.ChildIndex, state.Transform, intersectingTransform))
                 {
                     return true;

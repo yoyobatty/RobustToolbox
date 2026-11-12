@@ -29,15 +29,24 @@ internal sealed partial class PvsSystem
         HashSet<ushort>? netComps = sendCompList ? GetNetComponentSet() : null;
         var stateEv = new ComponentGetState(player, fromTick);
 
-        foreach (var (netId, component) in meta.NetComponents)
+        foreach (var (netId, icomp) in meta.NetComponents)
         {
-            DebugTools.Assert(component.NetSyncEnabled);
+            DebugTools.Assert(icomp.NetSyncEnabled);
+
+            // Read through Component, not IComponent: this loop sees hundreds of component types, so the interface
+            // calls never devirtualize. Every registered component derives from Component.
+            DebugTools.Assert(icomp is Component);
+            var component = Unsafe.As<Component>(icomp);
 
             if (component.Deleted || !component.Initialized)
             {
                 Log.Error($"Entity manager returned deleted or uninitialized component of type {component.GetType()} on entity {ToPrettyString(entityUid)} while generating entity state data for {player?.Name ?? "replay"}");
                 continue;
             }
+
+            // Most components are unchanged; skip them before the virtual SendOnlyToOwner/SessionSpecific calls.
+            if (!sendCompList && component.LastModifiedTick <= fromTick)
+                continue;
 
             if (component.SendOnlyToOwner && player != null && player.AttachedEntity != entityUid)
                 continue;

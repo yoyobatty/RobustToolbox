@@ -142,7 +142,15 @@ namespace Robust.Shared.Timing
         /// <summary>
         ///     The length of a tick at the current TickRate. 1/TickRate.
         /// </summary>
-        public TimeSpan TickPeriod => TimeSpan.FromTicks((long)(1.0 / TickRate * TimeSpan.TicksPerSecond));
+        public TimeSpan TickPeriod => _tickPeriod;
+
+        // Cached because CurTime reads it on every call.
+        private TimeSpan _tickPeriod = CalcTickPeriod(0);
+
+        private static TimeSpan CalcTickPeriod(ushort tickRate)
+        {
+            return TimeSpan.FromTicks((long)(1.0 / tickRate * TimeSpan.TicksPerSecond));
+        }
 
         /// <summary>
         /// The remaining time left over after the last tick was ran.
@@ -247,6 +255,7 @@ namespace Robust.Shared.Timing
                 CacheCurTime(atTick);
 
             _tickRate = tickRate;
+            _tickPeriod = CalcTickPeriod(tickRate);
         }
 
         public virtual TimeSpan RealLocalToServer(TimeSpan local)

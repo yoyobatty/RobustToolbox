@@ -1,9 +1,11 @@
 using System;
+using System.Runtime.CompilerServices;
 using Robust.Shared.GameStates;
 using Robust.Shared.IoC;
 using Robust.Shared.Reflection;
 using Robust.Shared.Serialization.Manager.Attributes;
 using Robust.Shared.Timing;
+using Robust.Shared.Utility;
 using Robust.Shared.ViewVariables;
 
 namespace Robust.Shared.GameObjects
@@ -78,6 +80,17 @@ namespace Robust.Shared.GameObjects
         /// <inheritdoc />
         [ViewVariables]
         public bool Deleted => LifeStage >= ComponentLifeStage.Removing;
+
+        /// <summary>
+        ///     <see cref="Deleted"/> without the interface call. Registration only accepts types derived from
+        ///     <see cref="Component"/>, so any component read out of entity manager storage is one.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsDeleted(IComponent component)
+        {
+            DebugTools.Assert(component is Component);
+            return Unsafe.As<Component>(component).LifeStage >= ComponentLifeStage.Removing;
+        }
 
         /// <summary>
         ///     This is the tick the component was created.

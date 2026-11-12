@@ -58,6 +58,10 @@ namespace Robust.Client.UserInterface
 
         // Styling needs to be updated.
         private bool _stylingDirty;
+
+        // Thread static because integration tests run several clients in one process.
+        [System.ThreadStatic]
+        private static List<(int index, StyleRule rule)>? _styleRuleScratch;
         // _actualStylesheetCached needs update.
         private bool _stylesheetUpdateNeeded;
         internal int RestyleGeneration;
@@ -123,6 +127,11 @@ namespace Robust.Client.UserInterface
             _styleClasses.Add(className);
         }
 
+        /// <summary>
+        ///     True while a style update is pending. False means one already ran since the last <see cref="Restyle"/>.
+        /// </summary>
+        internal bool StylingDirty => _stylingDirty;
+
         internal void Restyle()
         {
             if (_stylingDirty)
@@ -184,7 +193,9 @@ namespace Robust.Client.UserInterface
             }
 
             // Get all rules that apply to us, sort them and apply they params again.
-            var ruleList = new List<(int index, StyleRule rule)>();
+            // Reused scratch list. It is used up before StylePropertiesChanged runs, so re-entry can't clobber it.
+            var ruleList = _styleRuleScratch ??= new();
+            ruleList.Clear();
 
             // Unsorted rules
             foreach (var (index, rule) in stylesheet.UnsortedRules)
@@ -237,6 +248,8 @@ namespace Robust.Client.UserInterface
                     _styleProperties[property.Name] = property.Value;
                 }
             }
+
+            ruleList.Clear();
 
             StylePropertiesChanged();
 

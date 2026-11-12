@@ -773,7 +773,7 @@ namespace Robust.Shared.GameObjects
         {
             var dict = _entTraitArray[CompIdx.ArrayIndex<T>()];
             DebugTools.Assert(dict != null, $"Unknown component: {typeof(T).Name}");
-            return dict.TryGetValue(uid, out var comp) && !comp.Deleted;
+            return dict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <inheritdoc />
@@ -789,7 +789,7 @@ namespace Robust.Shared.GameObjects
         public bool HasComponent(EntityUid uid, ComponentRegistration reg)
         {
             var dict = _entTraitArray[reg.Idx.Value];
-            return dict.TryGetValue(uid, out var comp) && !comp.Deleted;
+            return dict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <inheritdoc />
@@ -798,7 +798,7 @@ namespace Robust.Shared.GameObjects
         public bool HasComponent(EntityUid uid, Type type)
         {
             var dict = _entTraitDict[type];
-            return dict.TryGetValue(uid, out var comp) && !comp.Deleted;
+            return dict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <inheritdoc />
@@ -812,7 +812,7 @@ namespace Robust.Shared.GameObjects
             }
 
             var dict = _entTraitDict[type];
-            return dict.TryGetValue(uid.Value, out var comp) && !comp.Deleted;
+            return dict.TryGetValue(uid.Value, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <inheritdoc />
@@ -902,7 +902,7 @@ namespace Robust.Shared.GameObjects
             DebugTools.Assert(dict != null, $"Unknown component: {typeof(T).Name}");
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     return (T)comp;
                 }
@@ -917,7 +917,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitArray[type.Value];
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                     return comp;
             }
 
@@ -932,7 +932,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitDict[type];
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     return comp;
                 }
@@ -969,7 +969,7 @@ namespace Robust.Shared.GameObjects
             DebugTools.Assert(dict != null, $"Unknown component: {typeof(T).Name}");
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     component = (T)comp;
                     return true;
@@ -989,17 +989,7 @@ namespace Robust.Shared.GameObjects
                 return false;
             }
 
-            if (TryGetComponent(uid.Value, typeof(T), out var comp))
-            {
-                if (!comp.Deleted)
-                {
-                    component = (T)comp;
-                    return true;
-                }
-            }
-
-            component = default;
-            return false;
+            return TryGetComponent(uid.Value, out component);
         }
 
         /// <inheritdoc />
@@ -1008,7 +998,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitArray[reg.Idx.Value];
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     component = comp;
                     return true;
@@ -1025,7 +1015,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitDict[type];
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     component = comp;
                     return true;
@@ -1041,7 +1031,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitArray[type.Value];
             if (dict.TryGetValue(uid, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     component = comp;
                     return true;
@@ -1065,7 +1055,7 @@ namespace Robust.Shared.GameObjects
             var dict = _entTraitDict[type];
             if (dict.TryGetValue(uid.Value, out var comp))
             {
-                if (!comp.Deleted)
+                if (!Component.IsDeleted(comp))
                 {
                     component = comp;
                     return true;
@@ -1227,7 +1217,7 @@ namespace Robust.Shared.GameObjects
             // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var comp in _entCompIndex[uid].ToArray())
             {
-                if (comp.Deleted) continue;
+                if (Component.IsDeleted(comp)) continue;
 
                 yield return comp;
             }
@@ -1271,7 +1261,7 @@ namespace Robust.Shared.GameObjects
             var comps = _entCompIndex[uid].ToArray();
             foreach (var comp in comps)
             {
-                if (comp.Deleted || comp is not T tComp) continue;
+                if (Component.IsDeleted(comp) || comp is not T tComp) continue;
 
                 yield return tComp;
             }
@@ -1520,7 +1510,7 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var t1Comp in comps.Values)
                 {
-                    if (t1Comp.Deleted) continue;
+                    if (Component.IsDeleted(t1Comp)) continue;
 
                     yield return (T)t1Comp;
                 }
@@ -1529,7 +1519,7 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, t1Comp) in comps)
                 {
-                    if (t1Comp.Deleted || !MetaQuery.TryGetComponentInternal(uid, out var metaComp)) continue;
+                    if (Component.IsDeleted(t1Comp) || !MetaQuery.TryGetComponentInternal(uid, out var metaComp)) continue;
 
                     if (metaComp.EntityPaused) continue;
 
@@ -1552,7 +1542,7 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, t1Comp) in trait1)
                 {
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
                     yield return (
@@ -1567,10 +1557,10 @@ namespace Robust.Shared.GameObjects
                 foreach (var (uid, t1Comp) in trait1)
                 {
                     // Check paused last because 90% of the time the component's likely not gonna be paused.
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
-                    if (t1Comp.Deleted || !metaComps.TryGetValue(uid, out var metaComp)) continue;
+                    if (Component.IsDeleted(t1Comp) || !metaComps.TryGetValue(uid, out var metaComp)) continue;
 
                     var meta = (MetaDataComponent)metaComp;
 
@@ -1597,10 +1587,10 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, t1Comp) in trait1)
                 {
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
-                    if (!trait3.TryGetValue(uid, out var t3Comp) || t3Comp.Deleted)
+                    if (!trait3.TryGetValue(uid, out var t3Comp) || Component.IsDeleted(t3Comp))
                         continue;
 
                     yield return (
@@ -1616,13 +1606,13 @@ namespace Robust.Shared.GameObjects
                 foreach (var (uid, t1Comp) in trait1)
                 {
                     // Check paused last because 90% of the time the component's likely not gonna be paused.
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
-                    if (!trait3.TryGetValue(uid, out var t3Comp) || t3Comp.Deleted)
+                    if (!trait3.TryGetValue(uid, out var t3Comp) || Component.IsDeleted(t3Comp))
                         continue;
 
-                    if (t1Comp.Deleted || !metaComps.TryGetValue(uid, out var metaComp)) continue;
+                    if (Component.IsDeleted(t1Comp) || !metaComps.TryGetValue(uid, out var metaComp)) continue;
 
                     var meta = (MetaDataComponent)metaComp;
 
@@ -1653,13 +1643,13 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, t1Comp) in trait1)
                 {
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
-                    if (!trait3.TryGetValue(uid, out var t3Comp) || t3Comp.Deleted)
+                    if (!trait3.TryGetValue(uid, out var t3Comp) || Component.IsDeleted(t3Comp))
                         continue;
 
-                    if (!trait4.TryGetValue(uid, out var t4Comp) || t4Comp.Deleted)
+                    if (!trait4.TryGetValue(uid, out var t4Comp) || Component.IsDeleted(t4Comp))
                         continue;
 
                     yield return (
@@ -1676,16 +1666,16 @@ namespace Robust.Shared.GameObjects
                 foreach (var (uid, t1Comp) in trait1)
                 {
                     // Check paused last because 90% of the time the component's likely not gonna be paused.
-                    if (!trait2.TryGetValue(uid, out var t2Comp) || t2Comp.Deleted)
+                    if (!trait2.TryGetValue(uid, out var t2Comp) || Component.IsDeleted(t2Comp))
                         continue;
 
-                    if (!trait3.TryGetValue(uid, out var t3Comp) || t3Comp.Deleted)
+                    if (!trait3.TryGetValue(uid, out var t3Comp) || Component.IsDeleted(t3Comp))
                         continue;
 
-                    if (!trait4.TryGetValue(uid, out var t4Comp) || t4Comp.Deleted)
+                    if (!trait4.TryGetValue(uid, out var t4Comp) || Component.IsDeleted(t4Comp))
                         continue;
 
-                    if (t1Comp.Deleted || !metaComps.TryGetValue(uid, out var metaComp)) continue;
+                    if (Component.IsDeleted(t1Comp) || !metaComps.TryGetValue(uid, out var metaComp)) continue;
 
                     var meta = (MetaDataComponent)metaComp;
 
@@ -1711,7 +1701,7 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, comp) in comps)
                 {
-                    if (comp.Deleted) continue;
+                    if (Component.IsDeleted(comp)) continue;
 
                     yield return (uid, comp);
                 }
@@ -1720,7 +1710,7 @@ namespace Robust.Shared.GameObjects
             {
                 foreach (var (uid, comp) in comps)
                 {
-                    if (comp.Deleted || !MetaQuery.TryGetComponent(uid, out var meta) || meta.EntityPaused) continue;
+                    if (Component.IsDeleted(comp) || !MetaQuery.TryGetComponent(uid, out var meta) || meta.EntityPaused) continue;
 
                     yield return (uid, comp);
                 }
@@ -1846,7 +1836,7 @@ namespace Robust.Shared.GameObjects
         [Pure]
         public TComp1 GetComponent(EntityUid uid)
         {
-            if (_traitDict.TryGetValue(uid, out var comp) && !comp.Deleted)
+            if (_traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp))
                 return (TComp1) comp;
 
             throw new KeyNotFoundException($"Entity {uid} does not have a component of type {typeof(TComp1)}");
@@ -1856,7 +1846,7 @@ namespace Robust.Shared.GameObjects
         [MethodImpl(MethodImplOptions.AggressiveInlining), Pure]
         public Entity<TComp1> Get(EntityUid uid)
         {
-            if (_traitDict.TryGetValue(uid, out var comp) && !comp.Deleted)
+            if (_traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp))
                 return new Entity<TComp1>(uid, (TComp1) comp);
 
             throw new KeyNotFoundException($"Entity {uid} does not have a component of type {typeof(TComp1)}");
@@ -1896,7 +1886,7 @@ namespace Robust.Shared.GameObjects
         [Pure]
         public bool TryGetComponent(EntityUid uid, [NotNullWhen(true)] out TComp1? component)
         {
-            if (_traitDict.TryGetValue(uid, out var comp) && !comp.Deleted)
+            if (_traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp))
             {
                 component = (TComp1) comp;
                 return true;
@@ -1944,7 +1934,7 @@ namespace Robust.Shared.GameObjects
         [Pure]
         public bool HasComponent(EntityUid uid)
         {
-            return _traitDict.TryGetValue(uid, out var comp) && !comp.Deleted;
+            return _traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <inheritdoc cref="HasComp(Robust.Shared.GameObjects.EntityUid)"/>
@@ -1972,7 +1962,7 @@ namespace Robust.Shared.GameObjects
                 return true;
             }
 
-            if (_traitDict.TryGetValue(uid, out var comp) && !comp.Deleted)
+            if (_traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp))
             {
                 component = (TComp1)comp;
                 return true;
@@ -2075,7 +2065,7 @@ namespace Robust.Shared.GameObjects
         [Pure]
         internal bool HasComponentInternal(EntityUid uid)
         {
-            return _traitDict.TryGetValue(uid, out var comp) && !comp.Deleted;
+            return _traitDict.TryGetValue(uid, out var comp) && !Component.IsDeleted(comp);
         }
 
         /// <summary>
@@ -2151,7 +2141,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2168,7 +2158,7 @@ namespace Robust.Shared.GameObjects
                         continue;
 
                     if (!_entManager.TryGetComponent(current.Key, comp.Value.Component.GetType(), out var nextComp) ||
-                        nextComp.Deleted)
+                        Component.IsDeleted(nextComp))
                     {
                         found = false;
                         break;
@@ -2215,7 +2205,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2304,7 +2294,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2389,7 +2379,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2399,7 +2389,7 @@ namespace Robust.Shared.GameObjects
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
@@ -2486,7 +2476,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2496,12 +2486,12 @@ namespace Robust.Shared.GameObjects
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || comp3Obj.Deleted)
+                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || Component.IsDeleted(comp3Obj))
                 {
                     continue;
                 }
@@ -2598,7 +2588,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2608,17 +2598,17 @@ namespace Robust.Shared.GameObjects
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || comp3Obj.Deleted)
+                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || Component.IsDeleted(comp3Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict4.TryGetValue(current.Key, out var comp4Obj) || comp4Obj.Deleted)
+                if (!_traitDict4.TryGetValue(current.Key, out var comp4Obj) || Component.IsDeleted(comp4Obj))
                 {
                     continue;
                 }
@@ -2729,7 +2719,7 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
@@ -2805,12 +2795,12 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
@@ -2892,17 +2882,17 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || comp3Obj.Deleted)
+                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || Component.IsDeleted(comp3Obj))
                 {
                     continue;
                 }
@@ -2993,22 +2983,22 @@ namespace Robust.Shared.GameObjects
 
                 var current = _traitDict.Current;
 
-                if (current.Value.Deleted)
+                if (Component.IsDeleted(current.Value))
                 {
                     continue;
                 }
 
-                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || comp2Obj.Deleted)
+                if (!_traitDict2.TryGetValue(current.Key, out var comp2Obj) || Component.IsDeleted(comp2Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || comp3Obj.Deleted)
+                if (!_traitDict3.TryGetValue(current.Key, out var comp3Obj) || Component.IsDeleted(comp3Obj))
                 {
                     continue;
                 }
 
-                if (!_traitDict4.TryGetValue(current.Key, out var comp4Obj) || comp4Obj.Deleted)
+                if (!_traitDict4.TryGetValue(current.Key, out var comp4Obj) || Component.IsDeleted(comp4Obj))
                 {
                     continue;
                 }

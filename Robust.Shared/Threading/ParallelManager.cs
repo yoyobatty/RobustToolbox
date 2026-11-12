@@ -98,6 +98,9 @@ internal sealed partial class ParallelManager : IParallelManagerInternal
     private readonly ObjectPool<ParallelTracker> _trackerPool =
         new DefaultObjectPool<ParallelTracker>(new DefaultPooledObjectPolicy<ParallelTracker>(), 1024);
 
+    private readonly ObjectPool<NowTracker> _nowTrackerPool =
+        new DefaultObjectPool<NowTracker>(new DefaultPooledObjectPolicy<NowTracker>(), 64);
+
     public void Initialize()
     {
         _sawmill = _logs.GetSawmill("parallel");
@@ -186,9 +189,30 @@ internal sealed partial class ParallelManager : IParallelManagerInternal
             return;
         }
 
-        var tracker = InternalProcess(job, amount);
-        tracker.Event.WaitHandle.WaitOne();
-        _trackerPool.Return(tracker);
+        if (amount <= 0)
+            return;
+
+        var batchSize = job.BatchSize;
+        var batchCount = (int) MathF.Ceiling(batches);
+
+        // The calling thread works through batches too, so it only needs helpers for the other cores.
+        // Queueing one work item per batch made the caller sleep while the pool did everything.
+        var helpers = Math.Max(0,
+            Math.Min(batchCount - 1, Math.Min(ParallelProcessCount, Environment.ProcessorCount) - 1));
+
+        var tracker = _nowTrackerPool.Get();
+        tracker.Setup(_sawmill, job, batchSize, amount, batchCount, helpers, _nowTrackerPool);
+
+        for (var i = 0; i < helpers; i++)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(tracker, true);
+        }
+
+        tracker.RunBatches();
+
+        // Spins before blocking. Avoid WaitHandle here, it forces a kernel event onto the pooled tracker.
+        tracker.Done.Wait();
+        tracker.Release();
     }
 
     public void ProcessSerialNow(IParallelRangeRobustJob jobs, int amount)
@@ -347,6 +371,90 @@ internal sealed partial class ParallelManager : IParallelManagerInternal
             // as the result of Decrement call and use it to prevent data race.
             if (Interlocked.Decrement(ref PendingTasks) <= 0)
                 Event.Set();
+        }
+    }
+
+    /// <summary>
+    /// Runs a blocking parallel job. The caller and each queued helper claim batches from a shared cursor
+    /// until none are left.
+    /// </summary>
+    private sealed class NowTracker : IThreadPoolWorkItem
+    {
+        /// <summary>
+        /// Set once every batch has finished.
+        /// </summary>
+        public readonly ManualResetEventSlim Done = new();
+
+        private ISawmill _sawmill = default!;
+        private IParallelRangeRobustJob _job = default!;
+        private ObjectPool<NowTracker> _pool = default!;
+        private int _batchSize;
+        private int _amount;
+        private int _batchCount;
+
+        private int _nextBatch;
+        private int _pendingBatches;
+
+        // Queued helpers plus the caller. A helper can start after the work is done, so the tracker only goes
+        // back to the pool once all of them have let go of it.
+        private int _refs;
+
+        public void Setup(
+            ISawmill sawmill,
+            IParallelRangeRobustJob job,
+            int batchSize,
+            int amount,
+            int batchCount,
+            int helpers,
+            ObjectPool<NowTracker> pool)
+        {
+            _sawmill = sawmill;
+            _job = job;
+            _pool = pool;
+            _batchSize = batchSize;
+            _amount = amount;
+            _batchCount = batchCount;
+            _nextBatch = 0;
+            _pendingBatches = batchCount;
+            _refs = helpers + 1;
+            Done.Reset();
+        }
+
+        public void RunBatches()
+        {
+            int batch;
+            while ((batch = Interlocked.Increment(ref _nextBatch) - 1) < _batchCount)
+            {
+                var start = batch * _batchSize;
+                var end = Math.Min(start + _batchSize, _amount);
+
+                try
+                {
+                    _job.ExecuteRange(start, end);
+                }
+                catch (Exception exc)
+                {
+                    _sawmill.Error($"Exception in ParallelManager: {exc}");
+                }
+
+                if (Interlocked.Decrement(ref _pendingBatches) == 0)
+                    Done.Set();
+            }
+        }
+
+        public void Execute()
+        {
+            RunBatches();
+            Release();
+        }
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _refs) != 0)
+                return;
+
+            _job = default!;
+            _pool.Return(this);
         }
     }
 

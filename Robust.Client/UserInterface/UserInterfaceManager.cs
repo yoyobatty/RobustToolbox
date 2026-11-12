@@ -244,7 +244,9 @@ namespace Robust.Client.UserInterface
 
                     var control = _styleUpdateQueue.Dequeue();
 
-                    if (control.Disposed)
+                    // Skip controls that were already restyled since being queued, e.g. by the forced style
+                    // update in Measure() before a window opens. Queue entries are not removed when that happens.
+                    if (control.Disposed || !control.StylingDirty)
                         continue;
 
                     control.DoStyleUpdate();

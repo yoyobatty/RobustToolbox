@@ -122,7 +122,7 @@ public sealed partial class RayCastSystem
             return input.MaxFraction;
         }
 
-        var transform = worldContext.Physics.GetLocalPhysicsTransform(proxy.Entity);
+        var transform = worldContext.Physics.GetLocalPhysicsTransform(proxy.Entity, proxy.Xform);
         var output = worldContext.System.RayCastShape(input, proxy.Fixture.Shape, transform);
 
         if (output.Hit)
@@ -434,7 +434,7 @@ public sealed partial class RayCastSystem
             return input.MaxFraction;
         }
 
-        var transform = worldContext.Physics.GetLocalPhysicsTransform(proxy.Entity);
+        var transform = worldContext.Physics.GetLocalPhysicsTransform(proxy.Entity, proxy.Xform);
         var output = ShapeCastShape(input, proxy.Fixture.Shape, transform);
 
         if (output.Hit)

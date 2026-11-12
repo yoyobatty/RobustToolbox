@@ -202,6 +202,13 @@ public sealed partial class SerializationManager
 
         private readonly Lock _lock = new();
 
+        /// <summary>
+        ///     Types with no copier or copy creator, indexed by <see cref="TypeInformation.Id"/>.
+        /// </summary>
+        private bool[] _copierMisses = [];
+
+        private int _registrationVersion;
+
         #region GetSerializerMethods
 
         public bool TryGetTypeNodeSerializer<TInterface, TType, TNode>([NotNullWhen(true)] out TInterface? serializer)
@@ -361,6 +368,10 @@ public sealed partial class SerializationManager
             copyCreator = null;
 
             var information = SerializedType<TType>.Information;
+            var misses = _copierMisses;
+            if (information.Id < misses.Length && misses[information.Id])
+                return false;
+
             if (information.Id < _typeSerializersArray.Length &&
                 _typeSerializersArray[information.Id] is { } serializerArray)
             {
@@ -379,13 +390,48 @@ public sealed partial class SerializationManager
                     return true;
             }
 
+            var version = Volatile.Read(ref _registrationVersion);
+
             if (TryGetTypeSerializer(typeof(ITypeCopier<>), typeof(TType), out var rawCopier))
                 copier = (ITypeCopier<TType>) rawCopier;
 
             if (TryGetTypeSerializer(typeof(ITypeCopyCreator<>), typeof(TType), out var rawCopyCreator))
                 copyCreator = (ITypeCopyCreator<TType>) rawCopyCreator;
 
-            return copier != null || copyCreator != null;
+            if (copier != null || copyCreator != null)
+                return true;
+
+            AddCopierMiss(information.Id, version);
+            return false;
+        }
+
+        /// <summary>
+        ///     Remembers that a type has no copier or copy creator, so data definition fields skip the slow lookup
+        ///     on every copy. Not stored if a serializer was registered while the lookup ran.
+        /// </summary>
+        private void AddCopierMiss(int id, int version)
+        {
+            lock (_lock)
+            {
+                if (version != _registrationVersion)
+                    return;
+
+                var misses = _copierMisses;
+                if (id >= misses.Length)
+                    Array.Resize(ref misses, Math.Max((id + 1) * 2, 64));
+
+                misses[id] = true;
+                _copierMisses = misses;
+            }
+        }
+
+        private void ClearCopierMisses()
+        {
+            lock (_lock)
+            {
+                _registrationVersion++;
+                _copierMisses = [];
+            }
         }
 
         public TInterface GetTypeSerializer<TInterface, TType>()
@@ -456,6 +502,8 @@ public sealed partial class SerializationManager
                 }
             }
 
+            // After adding, so a lookup that ran before the add can't store a miss with the new version.
+            ClearCopierMisses();
             return obj;
         }
 
@@ -506,6 +554,7 @@ public sealed partial class SerializationManager
                 }
             }
 
+            ClearCopierMisses();
             return null;
         }
 

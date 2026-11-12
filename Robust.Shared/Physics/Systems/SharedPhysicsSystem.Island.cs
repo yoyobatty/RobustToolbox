@@ -1109,18 +1109,18 @@ public abstract partial class SharedPhysicsSystem
             var xform = bodyEnt.Comp2;
 
             var linVelocity = linearVelocities[offset + i];
-            var physicsDirtied = false;
 
+            // Dirty only the velocity fields so clients get a velocity delta state instead of the full physics state.
             if (!float.IsNaN(linVelocity.X) && !float.IsNaN(linVelocity.Y))
             {
-                physicsDirtied |= SetLinearVelocity(uid, linVelocity, false, body: body);
+                SetLinearVelocity(uid, linVelocity, body: body);
             }
 
             var angVelocity = angularVelocities[offset + i];
 
             if (!float.IsNaN(angVelocity))
             {
-                physicsDirtied |= SetAngularVelocity(uid, angVelocity, false, body: body);
+                SetAngularVelocity(uid, angVelocity, body: body);
             }
 
             // Temporary NaN guards until PVS is fixed.
@@ -1131,11 +1131,6 @@ public abstract partial class SharedPhysicsSystem
                     xform.LocalPosition + position,
                     xform.LocalRotation + angle,
                     xform);
-            }
-
-            if (physicsDirtied)
-            {
-                Dirty(uid, body);
             }
         }
     }
@@ -1154,6 +1149,11 @@ public abstract partial class SharedPhysicsSystem
             var body = island.Bodies[i];
 
             SetAwake(body, false);
+
+            // Falling asleep zeroes velocity and can turn off CanCollide without dirtying either.
+            // UpdateBodies only dirties the velocity fields, so send the full state on this tick.
+            if (!body.Comp1.Awake)
+                Dirty(body.Owner, body.Comp1);
         }
     }
 }

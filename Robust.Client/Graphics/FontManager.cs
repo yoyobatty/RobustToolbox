@@ -316,6 +316,8 @@ namespace Robust.Client.Graphics
             public FontFaceHandle FaceHandle { get; }
             public int Size { get; }
             private readonly Dictionary<float, ScaledFontData> _scaledData = new();
+            private float _lastScale;
+            private ScaledFontData? _lastScaledData;
             private readonly FontManager _fontManager;
             public readonly Dictionary<Rune, uint> GlyphMap;
 
@@ -339,6 +341,7 @@ namespace Robust.Client.Graphics
                     scaleData.Value.Stroker.Dispose();
                 }
                 _scaledData.Clear();
+                _lastScaledData = null;
             }
 
             public bool TryGetGlyph(
@@ -349,17 +352,35 @@ namespace Robust.Client.Graphics
                 out Texture? texture,
                 out OutlinedGlyph? outlinedGlyph)
             {
-                var glyph = GetGlyph(codePoint);
-                if (glyph == 0)
+                uint glyph = 0;
+                ScaledFontData scaled;
+                GlyphInfo glyphInfo;
+
+                // Text is drawn and measured rune by rune every frame, so skip the dictionaries for Latin-1.
+                var runeValue = codePoint.Value;
+                if ((uint) runeValue < ScaledFontData.RuneCacheSize
+                    && (scaled = GetScaleDatum(scale)).RuneCache[runeValue] is { } cached)
                 {
-                    metrics = default;
-                    texture = null;
-                    outlinedGlyph = null;
-                    return false;
+                    glyphInfo = cached;
+                }
+                else
+                {
+                    glyph = GetGlyph(codePoint);
+                    if (glyph == 0)
+                    {
+                        metrics = default;
+                        texture = null;
+                        outlinedGlyph = null;
+                        return false;
+                    }
+
+                    scaled = GetScaleDatum(scale);
+                    glyphInfo = _fontManager.EnsureGlyphCached(this, scaled, scale, glyph);
+
+                    if ((uint) runeValue < ScaledFontData.RuneCacheSize)
+                        scaled.RuneCache[runeValue] = glyphInfo;
                 }
 
-                var scaled = GetScaleDatum(scale);
-                var glyphInfo = _fontManager.EnsureGlyphCached(this, scaled, scale, glyph);
                 metrics = glyphInfo.Metrics;
                 texture = glyphInfo.Texture;
                 outlinedGlyph = null;
@@ -372,6 +393,9 @@ namespace Robust.Client.Graphics
                 var radius = (int) MathF.Round(outlineThickness * scale * FreeType26Dot6Scale);
                 if (radius <= 0)
                     return true;
+
+                if (glyph == 0)
+                    glyph = GetGlyph(codePoint);
 
                 var outlinedInfo = _fontManager.EnsureOutlinedGlyphCached(this, scaled, scale, glyph, radius);
                 if (outlinedInfo.Texture != null)
@@ -452,13 +476,18 @@ namespace Robust.Client.Graphics
 
             private ScaledFontData GetScaleDatum(float scale)
             {
-                if (_scaledData.TryGetValue(scale, out var datum))
+                // Callers almost always ask for the same scale as last time.
+                if (_lastScaledData != null && _lastScale == scale)
+                    return _lastScaledData;
+
+                if (!_scaledData.TryGetValue(scale, out var datum))
                 {
-                    return datum;
+                    datum = _fontManager._generateScaledDatum(this, scale);
+                    _scaledData.Add(scale, datum);
                 }
 
-                datum = _fontManager._generateScaledDatum(this, scale);
-                _scaledData.Add(scale, datum);
+                _lastScale = scale;
+                _lastScaledData = datum;
                 return datum;
             }
         }
@@ -474,8 +503,15 @@ namespace Robust.Client.Graphics
                 Stroker = new Stroker(library);
             }
 
+            public const int RuneCacheSize = 256;
+
             public readonly List<OwnedTexture> AtlasTextures = new();
             public readonly Dictionary<uint, GlyphInfo> GlyphInfos = new();
+
+            /// <summary>
+            /// <see cref="GlyphInfos"/> by rune value for Latin-1 runes the font has.
+            /// </summary>
+            public readonly GlyphInfo?[] RuneCache = new GlyphInfo?[RuneCacheSize];
             public readonly Dictionary<(uint Glyph, int Radius), OutlinedGlyphInfo> OutlinedGlyphInfos = new();
             public readonly Stroker Stroker;
             public readonly int Ascent;

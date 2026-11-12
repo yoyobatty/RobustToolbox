@@ -9,6 +9,10 @@ namespace Robust.Shared.Serialization.Manager
 
         internal object GetOrCreateCustomTypeSerializer(Type type)
         {
+            // Check first: the instance method group below allocates a new delegate on every call.
+            if (_customTypeSerializers.TryGetValue(type, out var serializer))
+                return serializer;
+
             return _customTypeSerializers.GetOrAdd(type, CreateSerializer);
         }
 
